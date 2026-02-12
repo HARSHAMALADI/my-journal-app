@@ -16,6 +16,7 @@ interface MonthData {
   goals: string;
   tasks: { text: string; done: boolean }[];
   notes: string;
+  habits: string[];
 }
 
 interface TodoItem {
@@ -30,6 +31,7 @@ interface DayData {
   schedule: { time: string; task: string }[];
   notes: string;
   drawing: string;
+  habits: { [name: string]: boolean };
 }
 
 // 5 AM to 12 AM (midnight) = 20 time slots
@@ -41,6 +43,7 @@ const DEFAULT_SCHEDULE = [
 
 const DEFAULT_MONTHLY_TASKS = Array.from({ length: 8 }, () => ({ text: "", done: false }));
 const DEFAULT_TODO_ITEMS: TodoItem[] = Array.from({ length: 6 }, () => ({ text: "", done: false }));
+const DEFAULT_HABITS: string[] = Array.from({ length: 6 }, () => "");
 
 function mKey(year: number, month: number) { return `${year}-${month}`; }
 function dKey(date: Date) { return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`; }
@@ -87,12 +90,12 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const [monthData, setMonthData] = useState<MonthData>({
-    goals: "", tasks: [...DEFAULT_MONTHLY_TASKS], notes: "",
+    goals: "", tasks: [...DEFAULT_MONTHLY_TASKS], notes: "", habits: [...DEFAULT_HABITS],
   });
   const [dayData, setDayData] = useState<DayData>({
     priorities: "", todo: [...DEFAULT_TODO_ITEMS], intention: "",
     schedule: DEFAULT_SCHEDULE.map((s) => ({ ...s })),
-    notes: "", drawing: "",
+    notes: "", drawing: "", habits: {},
   });
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,8 +107,13 @@ export default function Home() {
     if (!isClient || !user) return;
     const key = mKey(currentYear, currentMonth);
     loadData<MonthData>("months", key, {
-      goals: "", tasks: [...DEFAULT_MONTHLY_TASKS], notes: "",
-    }).then(setMonthData);
+      goals: "", tasks: [...DEFAULT_MONTHLY_TASKS], notes: "", habits: [...DEFAULT_HABITS],
+    }).then((loaded) => {
+      // Backward compat: ensure habits array exists
+      if (!Array.isArray(loaded.habits)) loaded.habits = [...DEFAULT_HABITS];
+      while (loaded.habits.length < 6) loaded.habits.push("");
+      setMonthData(loaded);
+    });
   }, [currentMonth, currentYear, isClient, user]);
 
   // Save month data (debounced)
@@ -125,9 +133,10 @@ export default function Home() {
     loadData<DayData>("days", key, {
       priorities: "", todo: [...DEFAULT_TODO_ITEMS], intention: "",
       schedule: DEFAULT_SCHEDULE.map((s) => ({ ...s })),
-      notes: "", drawing: "",
+      notes: "", drawing: "", habits: {},
     }).then((loaded) => {
       loaded.todo = normalizeTodo(loaded.todo);
+      if (!loaded.habits || typeof loaded.habits !== "object" || Array.isArray(loaded.habits)) loaded.habits = {};
       setDayData(loaded);
     });
   }, [selectedDate, isClient, user]);
@@ -228,10 +237,12 @@ export default function Home() {
             month={currentMonth} year={currentYear}
             onDayClick={handleDayClick}
             monthlyGoals={monthData.goals} monthlyTasks={monthData.tasks} notes={monthData.notes}
+            habits={monthData.habits}
             onGoalsChange={(v) => setMonthData((p) => ({ ...p, goals: v }))}
             onTaskToggle={(i) => setMonthData((p) => ({ ...p, tasks: p.tasks.map((t, idx) => idx === i ? { ...t, done: !t.done } : t) }))}
             onTaskChange={(i, text) => setMonthData((p) => ({ ...p, tasks: p.tasks.map((t, idx) => idx === i ? { ...t, text } : t) }))}
             onNotesChange={(v) => setMonthData((p) => ({ ...p, notes: v }))}
+            onHabitChange={(i, name) => setMonthData((p) => ({ ...p, habits: p.habits.map((h, idx) => idx === i ? name : h) }))}
             onPrevMonth={handlePrevMonth} onNextMonth={handleNextMonth}
             onBackToCover={() => setView("cover")}
           />
@@ -243,6 +254,9 @@ export default function Home() {
             date={selectedDate}
             priorities={dayData.priorities} todoItems={dayData.todo} intention={dayData.intention}
             schedule={dayData.schedule} dailyNotes={dayData.notes} drawingData={dayData.drawing}
+            habits={monthData.habits.filter((h) => h.trim())}
+            dailyHabits={dayData.habits || {}}
+            onHabitToggle={(name) => setDayData((p) => ({ ...p, habits: { ...p.habits, [name]: !p.habits[name] } }))}
             onPrioritiesChange={(v) => setDayData((p) => ({ ...p, priorities: v }))}
             onTodoToggle={(i) => setDayData((p) => { const todos = normalizeTodo(p.todo); return { ...p, todo: todos.map((t, idx) => idx === i ? { ...t, done: !t.done } : t) }; })}
             onTodoTextChange={(i, text) => setDayData((p) => { const todos = normalizeTodo(p.todo); return { ...p, todo: todos.map((t, idx) => idx === i ? { ...t, text } : t) }; })}

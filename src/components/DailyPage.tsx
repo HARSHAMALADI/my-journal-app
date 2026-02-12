@@ -17,9 +17,12 @@ interface DailyPageProps {
   schedule: { time: string; task: string }[];
   dailyNotes: string;
   drawingData: string;
+  habits: string[];
+  dailyHabits: { [name: string]: boolean };
   onPrioritiesChange: (val: string) => void;
   onTodoToggle: (index: number) => void;
   onTodoTextChange: (index: number, text: string) => void;
+  onHabitToggle: (name: string) => void;
   onIntentionChange: (val: string) => void;
   onScheduleChange: (index: number, task: string) => void;
   onNotesChange: (val: string) => void;
@@ -195,7 +198,8 @@ function DrawingCanvas({ data, onChange, readOnly }: { data: string; onChange: (
 /* ─── Main Daily Page ─── */
 export default function DailyPage({
   date, priorities, todoItems, intention, schedule, dailyNotes, drawingData,
-  onPrioritiesChange, onTodoToggle, onTodoTextChange, onIntentionChange, onScheduleChange,
+  habits, dailyHabits,
+  onPrioritiesChange, onTodoToggle, onTodoTextChange, onHabitToggle, onIntentionChange, onScheduleChange,
   onNotesChange, onDrawingChange, onBack, onPrevDay, onNextDay,
 }: DailyPageProps) {
   const dayOfWeek = DAY_NAMES[date.getDay()];
@@ -364,6 +368,46 @@ export default function DailyPage({
             />
           </div>
         </div>
+
+        {/* Habits */}
+        {habits && habits.length > 0 && (
+          <div className="mb-5 sm:mb-6">
+            <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold mb-2 pb-1 border-b border-line/50">
+              Habits
+            </h3>
+            <div className="flex flex-wrap gap-2 sm:gap-2.5">
+              {habits.map((habit) => {
+                const done = dailyHabits?.[habit] || false;
+                return (
+                  <button
+                    key={habit}
+                    onClick={() => !readOnly && onHabitToggle(habit)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg border transition-all ${
+                      done
+                        ? "bg-sage/15 border-sage/40 text-ink-dark"
+                        : "border-line/50 text-ink-light hover:border-ink-light/40"
+                    } ${readOnly ? "cursor-default" : "cursor-pointer"}`}
+                  >
+                    <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all ${
+                      done
+                        ? "bg-sage/60 border-sage/70"
+                        : "border-ink-light/30"
+                    }`}>
+                      {done && (
+                        <svg className="w-2 h-2 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className={`text-[11px] sm:text-xs font-sans ${done ? "text-ink-dark" : ""}`}>
+                      {habit}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Schedule + Notes side by side */}
         <div className="flex flex-col md:flex-row gap-4 sm:gap-6 mb-5 sm:mb-6">

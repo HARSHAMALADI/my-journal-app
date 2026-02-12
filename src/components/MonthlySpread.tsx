@@ -10,10 +10,12 @@ interface MonthlySpreadProps {
   monthlyGoals: string;
   monthlyTasks: { text: string; done: boolean }[];
   notes: string;
+  habits: string[];
   onGoalsChange: (val: string) => void;
   onTaskToggle: (index: number) => void;
   onTaskChange: (index: number, text: string) => void;
   onNotesChange: (val: string) => void;
+  onHabitChange: (index: number, name: string) => void;
   onPrevMonth: () => void;
   onNextMonth: () => void;
   onBackToCover: () => void;
@@ -35,8 +37,8 @@ function getFirstDayOfMonth(year: number, month: number) {
 }
 
 export default function MonthlySpread({
-  month, year, onDayClick, monthlyGoals, monthlyTasks, notes,
-  onGoalsChange, onTaskToggle, onTaskChange, onNotesChange,
+  month, year, onDayClick, monthlyGoals, monthlyTasks, notes, habits,
+  onGoalsChange, onTaskToggle, onTaskChange, onNotesChange, onHabitChange,
   onPrevMonth, onNextMonth, onBackToCover,
 }: MonthlySpreadProps) {
   const daysInMonth = getDaysInMonth(year, month);
@@ -170,6 +172,27 @@ export default function MonthlySpread({
                         task.done ? "text-ink-light line-through" : "text-ink-dark"
                       }`}
                       placeholder="..."
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Habits */}
+            <div className="border border-line/60 rounded-sm p-2.5 sm:p-3">
+              <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold mb-1.5 pb-1 border-b border-line/40">
+                Habits
+              </h3>
+              <div className="space-y-0">
+                {(habits || []).map((habit, idx) => (
+                  <div key={idx} className="flex items-center gap-1.5 sm:gap-2 h-6 sm:h-7">
+                    <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full border border-sage/50 bg-sage/10 flex-shrink-0" />
+                    <input
+                      type="text"
+                      value={habit}
+                      onChange={(e) => onHabitChange(idx, e.target.value)}
+                      className="flex-1 bg-transparent text-[11px] sm:text-xs font-sans text-ink-dark border-b border-line/30 pb-0.5 min-w-0"
+                      placeholder={`Habit ${idx + 1}`}
                     />
                   </div>
                 ))}
