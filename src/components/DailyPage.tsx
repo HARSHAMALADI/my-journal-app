@@ -4,16 +4,22 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Pen, Type, Eraser } from "lucide-react";
 
+interface TodoItem {
+  text: string;
+  done: boolean;
+}
+
 interface DailyPageProps {
   date: Date;
   priorities: string;
-  todoItems: string;
+  todoItems: TodoItem[];
   intention: string;
   schedule: { time: string; task: string }[];
   dailyNotes: string;
   drawingData: string;
   onPrioritiesChange: (val: string) => void;
-  onTodoChange: (val: string) => void;
+  onTodoToggle: (index: number) => void;
+  onTodoTextChange: (index: number, text: string) => void;
   onIntentionChange: (val: string) => void;
   onScheduleChange: (index: number, task: string) => void;
   onNotesChange: (val: string) => void;
@@ -189,7 +195,7 @@ function DrawingCanvas({ data, onChange, readOnly }: { data: string; onChange: (
 /* ─── Main Daily Page ─── */
 export default function DailyPage({
   date, priorities, todoItems, intention, schedule, dailyNotes, drawingData,
-  onPrioritiesChange, onTodoChange, onIntentionChange, onScheduleChange,
+  onPrioritiesChange, onTodoToggle, onTodoTextChange, onIntentionChange, onScheduleChange,
   onNotesChange, onDrawingChange, onBack, onPrevDay, onNextDay,
 }: DailyPageProps) {
   const dayOfWeek = DAY_NAMES[date.getDay()];
@@ -279,24 +285,72 @@ export default function DailyPage({
 
         {/* Three Boxes: Priorities / To Do / Intention */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-5 sm:mb-6">
-          {[
-            { title: "Priorities", value: priorities, onChange: onPrioritiesChange, placeholder: "Top priorities for today..." },
-            { title: "To Do", value: todoItems, onChange: onTodoChange, placeholder: "Tasks to complete..." },
-            { title: "Intention", value: intention, onChange: onIntentionChange, placeholder: "Today's intention or focus..." },
-          ].map((box) => (
-            <div key={box.title} className="border border-line/60 rounded-sm p-2.5 sm:p-3">
-              <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold mb-1.5 pb-1 border-b border-line/40">
-                {box.title}
-              </h3>
-              <textarea
-                value={box.value}
-                onChange={(e) => box.onChange(e.target.value)}
-                readOnly={readOnly}
-                className={`w-full bg-transparent text-ink-dark text-[11px] sm:text-xs font-sans resize-none lined-textarea h-[84px] sm:h-[112px] ${readOnly ? "opacity-70 cursor-default" : ""}`}
-                placeholder={readOnly ? "" : box.placeholder}
-              />
+          {/* Priorities */}
+          <div className="border border-line/60 rounded-sm p-2.5 sm:p-3">
+            <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold mb-1.5 pb-1 border-b border-line/40">
+              Priorities
+            </h3>
+            <textarea
+              value={priorities}
+              onChange={(e) => onPrioritiesChange(e.target.value)}
+              readOnly={readOnly}
+              className={`w-full bg-transparent text-ink-dark text-[11px] sm:text-xs font-sans resize-none lined-textarea h-[84px] sm:h-[112px] ${readOnly ? "opacity-70 cursor-default" : ""}`}
+              placeholder={readOnly ? "" : "Top priorities for today..."}
+            />
+          </div>
+
+          {/* To Do — Checklist with strikethrough */}
+          <div className="border border-line/60 rounded-sm p-2.5 sm:p-3">
+            <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold mb-1.5 pb-1 border-b border-line/40">
+              To Do
+            </h3>
+            <div className="space-y-0.5 h-[84px] sm:h-[112px] overflow-y-auto diary-scroll">
+              {todoItems.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-1.5 group">
+                  <button
+                    onClick={() => !readOnly && onTodoToggle(idx)}
+                    className={`w-3.5 h-3.5 shrink-0 rounded-[3px] border flex items-center justify-center transition-all ${
+                      item.done
+                        ? "bg-ink-light/30 border-ink-light/40"
+                        : "border-ink-light/30 hover:border-ink-light/50"
+                    } ${readOnly ? "cursor-default" : "cursor-pointer"}`}
+                  >
+                    {item.done && (
+                      <svg className="w-2.5 h-2.5 text-ink-dark" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                  <input
+                    type="text"
+                    value={item.text}
+                    onChange={(e) => onTodoTextChange(idx, e.target.value)}
+                    readOnly={readOnly}
+                    className={`flex-1 bg-transparent text-[11px] sm:text-xs font-sans min-w-0 py-0.5 transition-all ${
+                      item.done
+                        ? "line-through text-ink-light/50"
+                        : "text-ink-dark"
+                    } ${readOnly ? "opacity-70 cursor-default" : ""}`}
+                    placeholder={readOnly ? "" : `Task ${idx + 1}`}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          {/* Intention */}
+          <div className="border border-line/60 rounded-sm p-2.5 sm:p-3">
+            <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold mb-1.5 pb-1 border-b border-line/40">
+              Intention
+            </h3>
+            <textarea
+              value={intention}
+              onChange={(e) => onIntentionChange(e.target.value)}
+              readOnly={readOnly}
+              className={`w-full bg-transparent text-ink-dark text-[11px] sm:text-xs font-sans resize-none lined-textarea h-[84px] sm:h-[112px] ${readOnly ? "opacity-70 cursor-default" : ""}`}
+              placeholder={readOnly ? "" : "Today's intention or focus..."}
+            />
+          </div>
         </div>
 
         {/* Schedule + Notes side by side */}

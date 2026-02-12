@@ -18,9 +18,14 @@ interface MonthData {
   notes: string;
 }
 
+interface TodoItem {
+  text: string;
+  done: boolean;
+}
+
 interface DayData {
   priorities: string;
-  todo: string;
+  todo: TodoItem[];
   intention: string;
   schedule: { time: string; task: string }[];
   notes: string;
@@ -34,7 +39,8 @@ const DEFAULT_SCHEDULE = [
   "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM", "11:00 PM", "12:00 AM",
 ].map((time) => ({ time, task: "" }));
 
-const DEFAULT_TASKS = Array.from({ length: 8 }, () => ({ text: "", done: false }));
+const DEFAULT_MONTHLY_TASKS = Array.from({ length: 8 }, () => ({ text: "", done: false }));
+const DEFAULT_TODO_ITEMS: TodoItem[] = Array.from({ length: 6 }, () => ({ text: "", done: false }));
 
 function mKey(year: number, month: number) { return `${year}-${month}`; }
 function dKey(date: Date) { return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`; }
@@ -48,10 +54,10 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const [monthData, setMonthData] = useState<MonthData>({
-    goals: "", tasks: [...DEFAULT_TASKS], notes: "",
+    goals: "", tasks: [...DEFAULT_MONTHLY_TASKS], notes: "",
   });
   const [dayData, setDayData] = useState<DayData>({
-    priorities: "", todo: "", intention: "",
+    priorities: "", todo: [...DEFAULT_TODO_ITEMS], intention: "",
     schedule: DEFAULT_SCHEDULE.map((s) => ({ ...s })),
     notes: "", drawing: "",
   });
@@ -65,7 +71,7 @@ export default function Home() {
     if (!isClient || !user) return;
     const key = mKey(currentYear, currentMonth);
     loadData<MonthData>("months", key, {
-      goals: "", tasks: [...DEFAULT_TASKS], notes: "",
+      goals: "", tasks: [...DEFAULT_MONTHLY_TASKS], notes: "",
     }).then(setMonthData);
   }, [currentMonth, currentYear, isClient, user]);
 
@@ -84,10 +90,19 @@ export default function Home() {
     if (!isClient || !user) return;
     const key = dKey(selectedDate);
     loadData<DayData>("days", key, {
-      priorities: "", todo: "", intention: "",
+      priorities: "", todo: [...DEFAULT_TODO_ITEMS], intention: "",
       schedule: DEFAULT_SCHEDULE.map((s) => ({ ...s })),
       notes: "", drawing: "",
-    }).then(setDayData);
+    }).then((loaded) => {
+      // Backward compat: if todo was saved as a string, convert it
+      if (typeof loaded.todo === "string") {
+        const lines = (loaded.todo as string).split("\n").filter((l) => l.trim());
+        loaded.todo = lines.length > 0
+          ? lines.map((text) => ({ text, done: false }))
+          : [...DEFAULT_TODO_ITEMS];
+      }
+      setDayData(loaded);
+    });
   }, [selectedDate, isClient, user]);
 
   // Save day data (debounced)
@@ -202,7 +217,8 @@ export default function Home() {
             priorities={dayData.priorities} todoItems={dayData.todo} intention={dayData.intention}
             schedule={dayData.schedule} dailyNotes={dayData.notes} drawingData={dayData.drawing}
             onPrioritiesChange={(v) => setDayData((p) => ({ ...p, priorities: v }))}
-            onTodoChange={(v) => setDayData((p) => ({ ...p, todo: v }))}
+            onTodoToggle={(i) => setDayData((p) => ({ ...p, todo: p.todo.map((t, idx) => idx === i ? { ...t, done: !t.done } : t) }))}
+            onTodoTextChange={(i, text) => setDayData((p) => ({ ...p, todo: p.todo.map((t, idx) => idx === i ? { ...t, text } : t) }))}
             onIntentionChange={(v) => setDayData((p) => ({ ...p, intention: v }))}
             onScheduleChange={(i, task) => setDayData((p) => ({ ...p, schedule: p.schedule.map((s, idx) => idx === i ? { ...s, task } : s) }))}
             onNotesChange={(v) => setDayData((p) => ({ ...p, notes: v }))}
