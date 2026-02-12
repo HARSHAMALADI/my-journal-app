@@ -46,8 +46,17 @@ function getMiniCalendar(date: Date) {
   return { weeks, currentDay };
 }
 
+/* ─── Check if date is in the past ─── */
+function isPastDate(date: Date): boolean {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const check = new Date(date);
+  check.setHours(0, 0, 0, 0);
+  return check < today;
+}
+
 /* ─── Handwriting Canvas ─── */
-function DrawingCanvas({ data, onChange }: { data: string; onChange: (d: string) => void }) {
+function DrawingCanvas({ data, onChange, readOnly }: { data: string; onChange: (d: string) => void; readOnly?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<"pen" | "eraser">("pen");
@@ -144,30 +153,34 @@ function DrawingCanvas({ data, onChange }: { data: string; onChange: (d: string)
         <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold mr-auto">
           Sketch / Write
         </h3>
-        <button
-          onClick={() => setTool("pen")}
-          className={`p-1.5 rounded cursor-pointer transition-colors ${tool === "pen" ? "bg-ink-light/20 text-ink-dark" : "text-ink-light"}`}
-        >
-          <Pen size={13} />
-        </button>
-        <button
-          onClick={() => setTool("eraser")}
-          className={`p-1.5 rounded cursor-pointer transition-colors ${tool === "eraser" ? "bg-ink-light/20 text-ink-dark" : "text-ink-light"}`}
-        >
-          <Eraser size={13} />
-        </button>
-        <button onClick={clearCanvas} className="text-ink-light hover:text-ink-dark text-[9px] tracking-wider uppercase cursor-pointer ml-1 p-1">
-          Clear
-        </button>
+        {!readOnly && (
+          <>
+            <button
+              onClick={() => setTool("pen")}
+              className={`p-1.5 rounded cursor-pointer transition-colors ${tool === "pen" ? "bg-ink-light/20 text-ink-dark" : "text-ink-light"}`}
+            >
+              <Pen size={13} />
+            </button>
+            <button
+              onClick={() => setTool("eraser")}
+              className={`p-1.5 rounded cursor-pointer transition-colors ${tool === "eraser" ? "bg-ink-light/20 text-ink-dark" : "text-ink-light"}`}
+            >
+              <Eraser size={13} />
+            </button>
+            <button onClick={clearCanvas} className="text-ink-light hover:text-ink-dark text-[9px] tracking-wider uppercase cursor-pointer ml-1 p-1">
+              Clear
+            </button>
+          </>
+        )}
       </div>
       <canvas
         ref={canvasRef}
-        className="w-full h-[160px] sm:h-[200px] drawing-canvas stylus-area bg-transparent"
-        onPointerDown={startDrawing}
-        onPointerMove={draw}
-        onPointerUp={stopDrawing}
-        onPointerLeave={stopDrawing}
-        onPointerCancel={stopDrawing}
+        className={`w-full h-[160px] sm:h-[200px] drawing-canvas stylus-area bg-transparent ${readOnly ? "pointer-events-none" : ""}`}
+        onPointerDown={readOnly ? undefined : startDrawing}
+        onPointerMove={readOnly ? undefined : draw}
+        onPointerUp={readOnly ? undefined : stopDrawing}
+        onPointerLeave={readOnly ? undefined : stopDrawing}
+        onPointerCancel={readOnly ? undefined : stopDrawing}
       />
     </div>
   );
@@ -183,6 +196,7 @@ export default function DailyPage({
   const dayNum = date.getDate();
   const monthName = MONTH_NAMES[date.getMonth()];
   const { weeks, currentDay } = getMiniCalendar(date);
+  const readOnly = isPastDate(date);
 
   return (
     <motion.div
@@ -251,6 +265,18 @@ export default function DailyPage({
           </div>
         </div>
 
+        {/* Read-only banner for past dates */}
+        {readOnly && (
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-sm bg-ink-light/[0.07] border border-ink-light/20">
+            <svg className="w-3.5 h-3.5 text-ink-light shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v.01M12 9v3m-7.07 5.07a9 9 0 1114.14 0A9 9 0 014.93 17.07z" />
+            </svg>
+            <p className="text-[10px] sm:text-xs text-ink-light font-sans tracking-wide">
+              Past date — view only
+            </p>
+          </div>
+        )}
+
         {/* Three Boxes: Priorities / To Do / Intention */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-5 sm:mb-6">
           {[
@@ -265,8 +291,9 @@ export default function DailyPage({
               <textarea
                 value={box.value}
                 onChange={(e) => box.onChange(e.target.value)}
-                className="w-full bg-transparent text-ink-dark text-[11px] sm:text-xs font-sans resize-none lined-textarea h-[84px] sm:h-[112px]"
-                placeholder={box.placeholder}
+                readOnly={readOnly}
+                className={`w-full bg-transparent text-ink-dark text-[11px] sm:text-xs font-sans resize-none lined-textarea h-[84px] sm:h-[112px] ${readOnly ? "opacity-70 cursor-default" : ""}`}
+                placeholder={readOnly ? "" : box.placeholder}
               />
             </div>
           ))}
@@ -291,7 +318,8 @@ export default function DailyPage({
                     type="text"
                     value={slot.task}
                     onChange={(e) => onScheduleChange(idx, e.target.value)}
-                    className="flex-1 bg-transparent text-[11px] sm:text-xs text-ink-dark font-sans pl-1.5 sm:pl-2 min-w-0"
+                    readOnly={readOnly}
+                    className={`flex-1 bg-transparent text-[11px] sm:text-xs text-ink-dark font-sans pl-1.5 sm:pl-2 min-w-0 ${readOnly ? "opacity-70 cursor-default" : ""}`}
                   />
                 </div>
               ))}
@@ -306,14 +334,15 @@ export default function DailyPage({
             <textarea
               value={dailyNotes}
               onChange={(e) => onNotesChange(e.target.value)}
-              className="w-full bg-transparent text-ink-dark text-[11px] sm:text-xs font-sans resize-none lined-textarea h-[200px] sm:h-[280px]"
-              placeholder="Thoughts, ideas, reflections..."
+              readOnly={readOnly}
+              className={`w-full bg-transparent text-ink-dark text-[11px] sm:text-xs font-sans resize-none lined-textarea h-[200px] sm:h-[280px] ${readOnly ? "opacity-70 cursor-default" : ""}`}
+              placeholder={readOnly ? "" : "Thoughts, ideas, reflections..."}
             />
           </div>
         </div>
 
         {/* Drawing / Handwriting Canvas */}
-        <DrawingCanvas data={drawingData} onChange={onDrawingChange} />
+        <DrawingCanvas data={drawingData} onChange={onDrawingChange} readOnly={readOnly} />
 
         {/* Bottom spacer for mobile scroll */}
         <div className="h-8 sm:h-12" />
