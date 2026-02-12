@@ -21,6 +21,7 @@ interface DailyPageProps {
   drawingData: string;
   habits: string[];
   dailyHabits: { [name: string]: boolean };
+  habitStreaks: { [name: string]: number };
   onPrioritiesChange: (val: string) => void;
   onTodoToggle: (index: number) => void;
   onTodoTextChange: (index: number, text: string) => void;
@@ -181,7 +182,7 @@ const TAB_LIST = [
 /* ─── Main Daily Page ─── */
 export default function DailyPage({
   date, priorities, todoItems, intention, schedule, dailyNotes, drawingData,
-  habits, dailyHabits,
+  habits, dailyHabits, habitStreaks,
   onPrioritiesChange, onTodoToggle, onTodoTextChange, onHabitToggle, onIntentionChange, onScheduleChange,
   onNotesChange, onDrawingChange,
   calendarEvents, calendarLoading, calendarError, onRefreshCalendar,
@@ -340,9 +341,18 @@ export default function DailyPage({
                         </svg>
                       )}
                     </div>
-                    <span className={`text-sm sm:text-base md:text-lg font-sans ${done ? "text-ink-dark" : "text-ink-light"}`}>
+                    <span className={`text-sm sm:text-base md:text-lg font-sans flex-1 text-left ${done ? "text-ink-dark" : "text-ink-light"}`}>
                       {habit}
                     </span>
+                    {habitStreaks[habit] !== undefined && (
+                      <span className={`text-xs sm:text-sm font-sans px-2 py-0.5 rounded-full ${
+                        habitStreaks[habit] > 0
+                          ? "bg-amber-500/15 text-amber-400"
+                          : "bg-ink-light/10 text-ink-light/50"
+                      }`}>
+                        🔥 {habitStreaks[habit]}
+                      </span>
+                    )}
                   </button>
                 );
               })}

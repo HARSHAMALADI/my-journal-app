@@ -101,6 +101,9 @@ export default function Home() {
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Habit streak counts: { habitName: numberOfDaysCompleted }
+  const [habitStreaks, setHabitStreaks] = useState<{ [name: string]: number }>({});
+
   // Calendar integration state
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
@@ -176,6 +179,47 @@ export default function Home() {
       if (d) setDayData((prev) => ({ ...prev, drawing: d }));
     } catch { /* empty */ }
   }, [selectedDate, isClient]);
+
+  // Compute habit streaks for the current month
+  useEffect(() => {
+    if (!isClient || !user) return;
+    const habits = monthData.habits.filter((h) => h.trim());
+    if (habits.length === 0) { setHabitStreaks({}); return; }
+
+    const year = selectedDate.getFullYear();
+    const month = selectedDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    async function computeStreaks() {
+      const counts: { [name: string]: number } = {};
+      habits.forEach((h) => { counts[h] = 0; });
+
+      // Load all days in the month
+      const promises = [];
+      for (let d = 1; d <= daysInMonth; d++) {
+        const date = new Date(year, month, d);
+        const key = dKey(date);
+        promises.push(
+          loadData<DayData>("days", key, {
+            priorities: "", todo: [], intention: "",
+            schedule: [], notes: "", drawing: "", habits: {},
+          }).then((loaded) => {
+            const dayHabits = loaded.habits && typeof loaded.habits === "object" && !Array.isArray(loaded.habits)
+              ? loaded.habits
+              : {};
+            habits.forEach((h) => {
+              if (dayHabits[h]) counts[h] = (counts[h] || 0) + 1;
+            });
+          })
+        );
+      }
+
+      await Promise.all(promises);
+      setHabitStreaks({ ...counts });
+    }
+
+    computeStreaks();
+  }, [currentMonth, currentYear, isClient, user, monthData.habits, dayData.habits]);
 
   // Load Apple Calendar URL from localStorage
   useEffect(() => {
@@ -316,6 +360,7 @@ export default function Home() {
             schedule={dayData.schedule} dailyNotes={dayData.notes} drawingData={dayData.drawing}
             habits={monthData.habits.filter((h) => h.trim())}
             dailyHabits={dayData.habits || {}}
+            habitStreaks={habitStreaks}
             onHabitToggle={(name) => setDayData((p) => ({ ...p, habits: { ...p.habits, [name]: !p.habits[name] } }))}
             onPrioritiesChange={(v) => setDayData((p) => ({ ...p, priorities: v }))}
             onTodoToggle={(i) => setDayData((p) => { const todos = normalizeTodo(p.todo); return { ...p, todo: todos.map((t, idx) => idx === i ? { ...t, done: !t.done } : t) }; })}
