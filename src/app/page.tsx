@@ -45,6 +45,33 @@ const DEFAULT_TODO_ITEMS: TodoItem[] = Array.from({ length: 6 }, () => ({ text: 
 function mKey(year: number, month: number) { return `${year}-${month}`; }
 function dKey(date: Date) { return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`; }
 
+/** Ensure todo is always a properly shaped TodoItem[] */
+function normalizeTodo(todo: any): TodoItem[] {
+  // If it's a plain string (old format), convert lines to items
+  if (typeof todo === "string") {
+    const lines = (todo as string).split("\n").filter((l: string) => l.trim());
+    if (lines.length > 0) {
+      const items = lines.map((text: string) => ({ text, done: false }));
+      // Pad to at least 6 items
+      while (items.length < 6) items.push({ text: "", done: false });
+      return items;
+    }
+    return Array.from({ length: 6 }, () => ({ text: "", done: false }));
+  }
+  // If it's an array, ensure each item has proper shape
+  if (Array.isArray(todo)) {
+    const items = todo.map((item: any) => {
+      if (typeof item === "string") return { text: item, done: false };
+      if (item && typeof item === "object") return { text: item.text || "", done: !!item.done };
+      return { text: "", done: false };
+    });
+    while (items.length < 6) items.push({ text: "", done: false });
+    return items;
+  }
+  // Fallback
+  return Array.from({ length: 6 }, () => ({ text: "", done: false }));
+}
+
 export default function Home() {
   const { user, loading } = useAuth();
   const [isClient, setIsClient] = useState(false);
@@ -94,13 +121,7 @@ export default function Home() {
       schedule: DEFAULT_SCHEDULE.map((s) => ({ ...s })),
       notes: "", drawing: "",
     }).then((loaded) => {
-      // Backward compat: if todo was saved as a string, convert it
-      if (typeof loaded.todo === "string") {
-        const lines = (loaded.todo as string).split("\n").filter((l) => l.trim());
-        loaded.todo = lines.length > 0
-          ? lines.map((text) => ({ text, done: false }))
-          : [...DEFAULT_TODO_ITEMS];
-      }
+      loaded.todo = normalizeTodo(loaded.todo);
       setDayData(loaded);
     });
   }, [selectedDate, isClient, user]);
@@ -217,8 +238,8 @@ export default function Home() {
             priorities={dayData.priorities} todoItems={dayData.todo} intention={dayData.intention}
             schedule={dayData.schedule} dailyNotes={dayData.notes} drawingData={dayData.drawing}
             onPrioritiesChange={(v) => setDayData((p) => ({ ...p, priorities: v }))}
-            onTodoToggle={(i) => setDayData((p) => ({ ...p, todo: p.todo.map((t, idx) => idx === i ? { ...t, done: !t.done } : t) }))}
-            onTodoTextChange={(i, text) => setDayData((p) => ({ ...p, todo: p.todo.map((t, idx) => idx === i ? { ...t, text } : t) }))}
+            onTodoToggle={(i) => setDayData((p) => { const todos = normalizeTodo(p.todo); return { ...p, todo: todos.map((t, idx) => idx === i ? { ...t, done: !t.done } : t) }; })}
+            onTodoTextChange={(i, text) => setDayData((p) => { const todos = normalizeTodo(p.todo); return { ...p, todo: todos.map((t, idx) => idx === i ? { ...t, text } : t) }; })}
             onIntentionChange={(v) => setDayData((p) => ({ ...p, intention: v }))}
             onScheduleChange={(i, task) => setDayData((p) => ({ ...p, schedule: p.schedule.map((s, idx) => idx === i ? { ...s, task } : s) }))}
             onNotesChange={(v) => setDayData((p) => ({ ...p, notes: v }))}

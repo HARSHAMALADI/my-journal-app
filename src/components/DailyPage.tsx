@@ -204,6 +204,15 @@ export default function DailyPage({
   const { weeks, currentDay } = getMiniCalendar(date);
   const readOnly = isPastDate(date);
 
+  // Safety: ensure todoItems is always an array
+  const safeTodos: TodoItem[] = Array.isArray(todoItems)
+    ? todoItems.map((item) =>
+        item && typeof item === "object"
+          ? { text: item.text || "", done: !!item.done }
+          : { text: String(item || ""), done: false }
+      )
+    : Array.from({ length: 6 }, () => ({ text: "", done: false }));
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 15 }}
@@ -305,7 +314,7 @@ export default function DailyPage({
               To Do
             </h3>
             <div className="space-y-0.5 h-[84px] sm:h-[112px] overflow-y-auto diary-scroll">
-              {todoItems.map((item, idx) => (
+              {safeTodos.map((item, idx) => (
                 <div key={idx} className="flex items-center gap-1.5 group">
                   <button
                     onClick={() => !readOnly && onTodoToggle(idx)}
