@@ -1,4 +1,4 @@
-const CACHE_NAME = 'my-journal-v1';
+const CACHE_NAME = 'my-journal-v2';
 
 const STATIC_ASSETS = [
   '/',
@@ -48,18 +48,16 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For assets — cache first, then network
+  // For assets — network first, fallback to cache
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        // Cache new assets
+    fetch(event.request)
+      .then((response) => {
         if (response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return response;
-      });
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });
