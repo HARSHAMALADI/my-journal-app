@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
-import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Pen, Type, Eraser } from "lucide-react";
+import { useRef, useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronLeft, ChevronRight, Pen, Eraser } from "lucide-react";
 
 interface TodoItem {
   text: string;
@@ -38,24 +38,6 @@ const MONTH_NAMES = [
 ];
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-function getMiniCalendar(date: Date) {
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDay = new Date(year, month, 1).getDay();
-  const currentDay = date.getDate();
-  const weeks: (number | null)[][] = [];
-  let week: (number | null)[] = [];
-  for (let i = 0; i < firstDay; i++) week.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    week.push(d);
-    if (week.length === 7) { weeks.push(week); week = []; }
-  }
-  if (week.length > 0) { while (week.length < 7) week.push(null); weeks.push(week); }
-  return { weeks, currentDay };
-}
-
-/* ─── Check if date is in the past ─── */
 function isPastDate(date: Date): boolean {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -71,25 +53,20 @@ function DrawingCanvas({ data, onChange, readOnly }: { data: string; onChange: (
   const [tool, setTool] = useState<"pen" | "eraser">("pen");
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
 
-  // Load saved drawing
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    // Set canvas resolution
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * 2;
     canvas.height = rect.height * 2;
     ctx.scale(2, 2);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    // Restore
     if (data) {
       const img = new Image();
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, rect.width, rect.height);
-      };
+      img.onload = () => { ctx.drawImage(img, 0, 0, rect.width, rect.height); };
       img.src = data;
     }
   }, []);
@@ -101,7 +78,6 @@ function DrawingCanvas({ data, onChange, readOnly }: { data: string; onChange: (
   };
 
   const startDrawing = (e: React.PointerEvent) => {
-    // Only respond to pen/touch/mouse
     const canvas = canvasRef.current;
     if (!canvas) return;
     canvas.setPointerCapture(e.pointerId);
@@ -114,15 +90,11 @@ function DrawingCanvas({ data, onChange, readOnly }: { data: string; onChange: (
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!ctx || !canvas) return;
-
     const pos = getPos(e);
-    // Pressure sensitivity for Apple Pencil
     const pressure = e.pressure || 0.5;
-
     ctx.beginPath();
     ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
     ctx.lineTo(pos.x, pos.y);
-
     if (tool === "eraser") {
       ctx.globalCompositeOperation = "destination-out";
       ctx.lineWidth = 20;
@@ -131,7 +103,6 @@ function DrawingCanvas({ data, onChange, readOnly }: { data: string; onChange: (
       ctx.strokeStyle = "#5c4033";
       ctx.lineWidth = Math.max(1, pressure * 3);
     }
-
     ctx.stroke();
     lastPoint.current = pos;
   };
@@ -139,11 +110,8 @@ function DrawingCanvas({ data, onChange, readOnly }: { data: string; onChange: (
   const stopDrawing = () => {
     setIsDrawing(false);
     lastPoint.current = null;
-    // Save
     const canvas = canvasRef.current;
-    if (canvas) {
-      onChange(canvas.toDataURL("image/png"));
-    }
+    if (canvas) onChange(canvas.toDataURL("image/png"));
   };
 
   const clearCanvas = () => {
@@ -156,27 +124,23 @@ function DrawingCanvas({ data, onChange, readOnly }: { data: string; onChange: (
   };
 
   return (
-    <div className="border border-line/60 rounded-sm">
-      {/* Toolbar */}
-      <div className="flex items-center gap-1 px-2.5 py-1.5 border-b border-line/40">
-        <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold mr-auto">
-          Sketch / Write
-        </h3>
+    <div className="flex-1 flex flex-col">
+      <div className="flex items-center gap-2 mb-3">
         {!readOnly && (
           <>
             <button
               onClick={() => setTool("pen")}
-              className={`p-1.5 rounded cursor-pointer transition-colors ${tool === "pen" ? "bg-ink-light/20 text-ink-dark" : "text-ink-light"}`}
+              className={`p-2.5 rounded-lg cursor-pointer transition-colors ${tool === "pen" ? "bg-ink-light/20 text-ink-dark" : "text-ink-light"}`}
             >
-              <Pen size={13} />
+              <Pen size={18} />
             </button>
             <button
               onClick={() => setTool("eraser")}
-              className={`p-1.5 rounded cursor-pointer transition-colors ${tool === "eraser" ? "bg-ink-light/20 text-ink-dark" : "text-ink-light"}`}
+              className={`p-2.5 rounded-lg cursor-pointer transition-colors ${tool === "eraser" ? "bg-ink-light/20 text-ink-dark" : "text-ink-light"}`}
             >
-              <Eraser size={13} />
+              <Eraser size={18} />
             </button>
-            <button onClick={clearCanvas} className="text-ink-light hover:text-ink-dark text-[9px] tracking-wider uppercase cursor-pointer ml-1 p-1">
+            <button onClick={clearCanvas} className="text-ink-light hover:text-ink-dark text-xs tracking-wider uppercase cursor-pointer ml-auto px-3 py-2">
               Clear
             </button>
           </>
@@ -184,7 +148,7 @@ function DrawingCanvas({ data, onChange, readOnly }: { data: string; onChange: (
       </div>
       <canvas
         ref={canvasRef}
-        className={`w-full h-[160px] sm:h-[200px] drawing-canvas stylus-area bg-transparent ${readOnly ? "pointer-events-none" : ""}`}
+        className={`w-full flex-1 min-h-[300px] sm:min-h-[400px] drawing-canvas stylus-area bg-transparent border border-line/40 rounded-lg ${readOnly ? "pointer-events-none" : ""}`}
         onPointerDown={readOnly ? undefined : startDrawing}
         onPointerMove={readOnly ? undefined : draw}
         onPointerUp={readOnly ? undefined : stopDrawing}
@@ -194,6 +158,17 @@ function DrawingCanvas({ data, onChange, readOnly }: { data: string; onChange: (
     </div>
   );
 }
+
+/* ─── Tab definitions ─── */
+const TAB_LIST = [
+  { key: "priorities", label: "Priorities" },
+  { key: "todo", label: "To Do" },
+  { key: "intention", label: "Intention" },
+  { key: "habits", label: "Habits" },
+  { key: "schedule", label: "Schedule" },
+  { key: "notes", label: "Notes" },
+  { key: "sketch", label: "Sketch" },
+];
 
 /* ─── Main Daily Page ─── */
 export default function DailyPage({
@@ -205,8 +180,16 @@ export default function DailyPage({
   const dayOfWeek = DAY_NAMES[date.getDay()];
   const dayNum = date.getDate();
   const monthName = MONTH_NAMES[date.getMonth()];
-  const { weeks, currentDay } = getMiniCalendar(date);
   const readOnly = isPastDate(date);
+
+  const [activeTab, setActiveTab] = useState(0);
+  const touchStart = useRef(0);
+  const tabBarRef = useRef<HTMLDivElement>(null);
+
+  // Filter out habits tab if no habits defined
+  const visibleTabs = TAB_LIST.filter(
+    (t) => t.key !== "habits" || (habits && habits.length > 0)
+  );
 
   // Safety: ensure todoItems is always a clean array
   const safeTodos: TodoItem[] = Array.isArray(todoItems)
@@ -220,119 +203,63 @@ export default function DailyPage({
       })
     : Array.from({ length: 6 }, () => ({ text: "", done: false }));
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: 15 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -15 }}
-      transition={{ duration: 0.3 }}
-      className="paper-texture min-h-[100dvh] diary-scroll overflow-x-hidden"
-    >
-      <div className="max-w-5xl mx-auto px-3 sm:px-6 md:px-8 py-4 sm:py-6 md:py-8">
-        {/* Nav */}
-        <div className="flex items-center justify-between mb-3 sm:mb-4">
-          <button onClick={onBack} className="text-ink-light hover:text-ink-dark text-[10px] sm:text-xs tracking-widest uppercase cursor-pointer transition-colors">
-            {monthName}
-          </button>
-          <div className="flex items-center gap-2">
-            <button onClick={onPrevDay} className="text-ink-light hover:text-ink-dark cursor-pointer transition-colors p-2 -m-2">
-              <ChevronLeft size={16} />
-            </button>
-            <button onClick={onNextDay} className="text-ink-light hover:text-ink-dark cursor-pointer transition-colors p-2 -m-2">
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
+  // Swipe handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStart.current = e.touches[0].clientX;
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const delta = touchStart.current - e.changedTouches[0].clientX;
+    if (delta > 60 && activeTab < visibleTabs.length - 1) setActiveTab((a) => a + 1);
+    if (delta < -60 && activeTab > 0) setActiveTab((a) => a - 1);
+  };
 
-        {/* Decorative divider */}
-        <div className="flex items-center gap-3 mb-4 sm:mb-5">
-          <div className="flex-1 h-[0.5px] bg-ink-light/30" />
-          <div className="w-1 h-1 rotate-45 bg-ink-light/40" />
-          <div className="flex-1 h-[0.5px] bg-ink-light/30" />
-        </div>
+  // Scroll active tab into view
+  useEffect(() => {
+    if (!tabBarRef.current) return;
+    const activeEl = tabBarRef.current.children[activeTab] as HTMLElement;
+    if (activeEl) activeEl.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [activeTab]);
 
-        {/* Date + Mini Calendar */}
-        <div className="flex items-start justify-between mb-5 sm:mb-6">
-          <div className="flex items-end gap-2 sm:gap-3">
-            <span className="font-serif text-5xl sm:text-6xl md:text-7xl font-bold text-ink-dark leading-none">
-              {dayNum}
-            </span>
-            <div className="pb-0.5 sm:pb-1.5">
-              <p className="font-serif text-lg sm:text-xl md:text-2xl text-ink font-medium">{monthName}</p>
-              <p className="text-[9px] sm:text-[10px] tracking-[0.2em] uppercase text-ink-light font-medium">{dayOfWeek}</p>
-            </div>
-          </div>
+  const currentTab = visibleTabs[activeTab]?.key || "priorities";
 
-          <div className="hidden sm:block">
-            <table className="text-[8px] sm:text-[9px] text-ink-light">
-              <thead>
-                <tr>
-                  {["S","M","T","W","T","F","S"].map((d, i) => (
-                    <th key={i} className="w-4 sm:w-5 h-3 sm:h-4 font-medium">{d}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {weeks.map((week, wi) => (
-                  <tr key={wi}>
-                    {week.map((d, di) => (
-                      <td key={di} className={`w-4 sm:w-5 h-3 sm:h-4 text-center ${d === currentDay ? "text-ink-dark font-bold" : ""}`}>
-                        {d || ""}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Read-only banner for past dates */}
-        {readOnly && (
-          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-sm bg-ink-light/[0.07] border border-ink-light/20">
-            <svg className="w-3.5 h-3.5 text-ink-light shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v.01M12 9v3m-7.07 5.07a9 9 0 1114.14 0A9 9 0 014.93 17.07z" />
-            </svg>
-            <p className="text-[10px] sm:text-xs text-ink-light font-sans tracking-wide">
-              Past date — view only
+  /* ─── Tab Content Renderers ─── */
+  const renderTabContent = () => {
+    switch (currentTab) {
+      case "priorities":
+        return (
+          <div className="flex flex-col flex-1">
+            <p className="text-ink-light text-xs sm:text-sm tracking-wide mb-3 sm:mb-4">
+              What matters most today?
             </p>
-          </div>
-        )}
-
-        {/* Three Boxes: Priorities / To Do / Intention */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-5 sm:mb-6">
-          {/* Priorities */}
-          <div className="border border-line/60 rounded-sm p-2.5 sm:p-3">
-            <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold mb-1.5 pb-1 border-b border-line/40">
-              Priorities
-            </h3>
             <textarea
               value={priorities}
               onChange={(e) => onPrioritiesChange(e.target.value)}
               readOnly={readOnly}
-              className={`w-full bg-transparent text-ink-dark text-[11px] sm:text-xs font-sans resize-none lined-textarea h-[84px] sm:h-[112px] ${readOnly ? "opacity-70 cursor-default" : ""}`}
-              placeholder={readOnly ? "" : "Top priorities for today..."}
+              className={`w-full flex-1 bg-transparent text-ink-dark text-sm sm:text-base md:text-lg font-sans resize-none lined-textarea min-h-[300px] sm:min-h-[400px] ${readOnly ? "opacity-70 cursor-default" : ""}`}
+              placeholder={readOnly ? "" : "Write your top priorities for today..."}
             />
           </div>
+        );
 
-          {/* To Do — Checklist with strikethrough */}
-          <div className="border border-line/60 rounded-sm p-2.5 sm:p-3">
-            <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold mb-1.5 pb-1 border-b border-line/40">
-              To Do
-            </h3>
-            <div className="space-y-0.5 h-[84px] sm:h-[112px] overflow-y-auto diary-scroll">
+      case "todo":
+        return (
+          <div className="flex flex-col flex-1">
+            <p className="text-ink-light text-xs sm:text-sm tracking-wide mb-3 sm:mb-4">
+              Tasks to complete today
+            </p>
+            <div className="space-y-1 sm:space-y-2 flex-1">
               {safeTodos.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-1.5 group">
+                <div key={idx} className="flex items-center gap-3 group">
                   <button
                     onClick={() => !readOnly && onTodoToggle(idx)}
-                    className={`w-3.5 h-3.5 shrink-0 rounded-[3px] border flex items-center justify-center transition-all ${
+                    className={`w-5 h-5 sm:w-6 sm:h-6 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${
                       item.done
                         ? "bg-ink-light/30 border-ink-light/40"
                         : "border-ink-light/30 hover:border-ink-light/50"
                     } ${readOnly ? "cursor-default" : "cursor-pointer"}`}
                   >
                     {item.done && (
-                      <svg className="w-2.5 h-2.5 text-ink-dark" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                      <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-ink-dark" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     )}
@@ -342,7 +269,7 @@ export default function DailyPage({
                     value={item.text}
                     onChange={(e) => onTodoTextChange(idx, e.target.value)}
                     readOnly={readOnly}
-                    className={`flex-1 bg-transparent text-[11px] sm:text-xs font-sans min-w-0 py-0.5 transition-all ${
+                    className={`flex-1 bg-transparent text-sm sm:text-base md:text-lg font-sans min-w-0 py-1.5 sm:py-2 border-b border-line/30 transition-all ${
                       item.done
                         ? "line-through text-ink-light/50"
                         : "text-ink-dark"
@@ -353,53 +280,55 @@ export default function DailyPage({
               ))}
             </div>
           </div>
+        );
 
-          {/* Intention */}
-          <div className="border border-line/60 rounded-sm p-2.5 sm:p-3">
-            <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold mb-1.5 pb-1 border-b border-line/40">
-              Intention
-            </h3>
+      case "intention":
+        return (
+          <div className="flex flex-col flex-1">
+            <p className="text-ink-light text-xs sm:text-sm tracking-wide mb-3 sm:mb-4">
+              Set your focus for the day
+            </p>
             <textarea
               value={intention}
               onChange={(e) => onIntentionChange(e.target.value)}
               readOnly={readOnly}
-              className={`w-full bg-transparent text-ink-dark text-[11px] sm:text-xs font-sans resize-none lined-textarea h-[84px] sm:h-[112px] ${readOnly ? "opacity-70 cursor-default" : ""}`}
-              placeholder={readOnly ? "" : "Today's intention or focus..."}
+              className={`w-full flex-1 bg-transparent text-ink-dark text-sm sm:text-base md:text-lg font-sans resize-none lined-textarea min-h-[300px] sm:min-h-[400px] ${readOnly ? "opacity-70 cursor-default" : ""}`}
+              placeholder={readOnly ? "" : "What's your intention or focus for today?"}
             />
           </div>
-        </div>
+        );
 
-        {/* Habits */}
-        {habits && habits.length > 0 && (
-          <div className="mb-5 sm:mb-6">
-            <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold mb-2 pb-1 border-b border-line/50">
-              Habits
-            </h3>
-            <div className="flex flex-wrap gap-2 sm:gap-2.5">
+      case "habits":
+        return (
+          <div className="flex flex-col flex-1">
+            <p className="text-ink-light text-xs sm:text-sm tracking-wide mb-4 sm:mb-6">
+              Track your daily habits
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {habits.map((habit) => {
                 const done = dailyHabits?.[habit] || false;
                 return (
                   <button
                     key={habit}
                     onClick={() => !readOnly && onHabitToggle(habit)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg border transition-all ${
+                    className={`flex items-center gap-3 sm:gap-4 px-4 py-4 sm:px-5 sm:py-5 rounded-xl border-2 transition-all ${
                       done
-                        ? "bg-sage/15 border-sage/40 text-ink-dark"
-                        : "border-line/50 text-ink-light hover:border-ink-light/40"
+                        ? "bg-sage/12 border-sage/40"
+                        : "border-line/50 hover:border-ink-light/40"
                     } ${readOnly ? "cursor-default" : "cursor-pointer"}`}
                   >
-                    <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all ${
+                    <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 flex items-center justify-center transition-all ${
                       done
                         ? "bg-sage/60 border-sage/70"
                         : "border-ink-light/30"
                     }`}>
                       {done && (
-                        <svg className="w-2 h-2 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                       )}
                     </div>
-                    <span className={`text-[11px] sm:text-xs font-sans ${done ? "text-ink-dark" : ""}`}>
+                    <span className={`text-sm sm:text-base md:text-lg font-sans ${done ? "text-ink-dark" : "text-ink-light"}`}>
                       {habit}
                     </span>
                   </button>
@@ -407,21 +336,18 @@ export default function DailyPage({
               })}
             </div>
           </div>
-        )}
+        );
 
-        {/* Schedule + Notes side by side */}
-        <div className="flex flex-col md:flex-row gap-4 sm:gap-6 mb-5 sm:mb-6">
-          {/* Schedule 5AM - 12AM */}
-          <div className="md:w-1/2">
-            <div className="flex items-center gap-2 sm:gap-3 mb-2 pb-1 border-b border-line/50">
-              <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold">Schedule</h3>
-              <span className="text-[8px] text-ink-light/50">|</span>
-              <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold">Tasks</h3>
-            </div>
-            <div className="space-y-0 max-h-[400px] sm:max-h-[520px] overflow-y-auto diary-scroll">
+      case "schedule":
+        return (
+          <div className="flex flex-col flex-1">
+            <p className="text-ink-light text-xs sm:text-sm tracking-wide mb-3 sm:mb-4">
+              Plan your day hour by hour
+            </p>
+            <div className="space-y-0 flex-1 overflow-y-auto diary-scroll">
               {schedule.map((slot, idx) => (
-                <div key={idx} className="flex items-center border-b border-line/30 h-7 sm:h-8">
-                  <span className="w-12 sm:w-16 text-[9px] sm:text-[10px] text-ink-light font-medium shrink-0 tabular-nums">
+                <div key={idx} className="flex items-center border-b border-line/30 h-9 sm:h-11">
+                  <span className="w-16 sm:w-20 text-xs sm:text-sm text-ink-light font-medium shrink-0 tabular-nums">
                     {slot.time}
                   </span>
                   <input
@@ -429,33 +355,140 @@ export default function DailyPage({
                     value={slot.task}
                     onChange={(e) => onScheduleChange(idx, e.target.value)}
                     readOnly={readOnly}
-                    className={`flex-1 bg-transparent text-[11px] sm:text-xs text-ink-dark font-sans pl-1.5 sm:pl-2 min-w-0 ${readOnly ? "opacity-70 cursor-default" : ""}`}
+                    className={`flex-1 bg-transparent text-sm sm:text-base text-ink-dark font-sans pl-2 sm:pl-3 min-w-0 ${readOnly ? "opacity-70 cursor-default" : ""}`}
                   />
                 </div>
               ))}
             </div>
           </div>
+        );
 
-          {/* Notes */}
-          <div className="md:w-1/2">
-            <h3 className="text-[9px] sm:text-[10px] tracking-[0.25em] uppercase text-ink font-semibold mb-2 pb-1 border-b border-line/50">
-              Notes
-            </h3>
+      case "notes":
+        return (
+          <div className="flex flex-col flex-1">
+            <p className="text-ink-light text-xs sm:text-sm tracking-wide mb-3 sm:mb-4">
+              Thoughts, ideas, reflections
+            </p>
             <textarea
               value={dailyNotes}
               onChange={(e) => onNotesChange(e.target.value)}
               readOnly={readOnly}
-              className={`w-full bg-transparent text-ink-dark text-[11px] sm:text-xs font-sans resize-none lined-textarea h-[200px] sm:h-[280px] ${readOnly ? "opacity-70 cursor-default" : ""}`}
-              placeholder={readOnly ? "" : "Thoughts, ideas, reflections..."}
+              className={`w-full flex-1 bg-transparent text-ink-dark text-sm sm:text-base md:text-lg font-sans resize-none lined-textarea min-h-[300px] sm:min-h-[400px] ${readOnly ? "opacity-70 cursor-default" : ""}`}
+              placeholder={readOnly ? "" : "Write your thoughts, ideas, reflections..."}
             />
           </div>
+        );
+
+      case "sketch":
+        return <DrawingCanvas data={drawingData} onChange={onDrawingChange} readOnly={readOnly} />;
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 15 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -15 }}
+      transition={{ duration: 0.3 }}
+      className="paper-texture min-h-[100dvh] flex flex-col"
+    >
+      {/* Fixed Header Area */}
+      <div className="px-4 sm:px-6 md:px-8 pt-4 sm:pt-6 md:pt-8">
+        <div className="max-w-3xl mx-auto">
+          {/* Nav */}
+          <div className="flex items-center justify-between mb-3">
+            <button onClick={onBack} className="text-ink-light hover:text-ink-dark text-[10px] sm:text-xs tracking-widest uppercase cursor-pointer transition-colors">
+              {monthName}
+            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={onPrevDay} className="text-ink-light hover:text-ink-dark cursor-pointer transition-colors p-2 -m-2">
+                <ChevronLeft size={16} />
+              </button>
+              <button onClick={onNextDay} className="text-ink-light hover:text-ink-dark cursor-pointer transition-colors p-2 -m-2">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Date header */}
+          <div className="flex items-end gap-2 sm:gap-3 mb-4 sm:mb-5">
+            <span className="font-serif text-4xl sm:text-5xl md:text-6xl font-bold text-ink-dark leading-none">
+              {dayNum}
+            </span>
+            <div className="pb-0.5 sm:pb-1">
+              <p className="font-serif text-base sm:text-lg md:text-xl text-ink font-medium">{monthName}</p>
+              <p className="text-[9px] sm:text-[10px] tracking-[0.2em] uppercase text-ink-light font-medium">{dayOfWeek}</p>
+            </div>
+          </div>
+
+          {/* Read-only banner */}
+          {readOnly && (
+            <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-ink-light/[0.07] border border-ink-light/20">
+              <svg className="w-3.5 h-3.5 text-ink-light shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v.01M12 9v3m-7.07 5.07a9 9 0 1114.14 0A9 9 0 014.93 17.07z" />
+              </svg>
+              <p className="text-[10px] sm:text-xs text-ink-light font-sans tracking-wide">
+                Past date — view only
+              </p>
+            </div>
+          )}
+
+          {/* Tab bar */}
+          <div
+            ref={tabBarRef}
+            className="flex gap-1 overflow-x-auto pb-3 sm:pb-4 hide-scrollbar"
+          >
+            {visibleTabs.map((tab, idx) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(idx)}
+                className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-sans whitespace-nowrap transition-all cursor-pointer ${
+                  idx === activeTab
+                    ? "bg-ink-dark text-cream font-medium shadow-sm"
+                    : "text-ink-light hover:text-ink-dark hover:bg-cream-dark/40"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Divider */}
+          <div className="h-[0.5px] bg-ink-light/25" />
+        </div>
+      </div>
+
+      {/* Tab content area — swipeable */}
+      <div
+        className="flex-1 flex flex-col px-4 sm:px-6 md:px-8 py-4 sm:py-6"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div className="max-w-3xl mx-auto w-full flex-1 flex flex-col">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentTab}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+              className="flex-1 flex flex-col"
+            >
+              {/* Tab title */}
+              <h2 className="font-serif text-xl sm:text-2xl md:text-3xl text-ink-dark font-semibold mb-2 sm:mb-3">
+                {visibleTabs[activeTab]?.label}
+              </h2>
+
+              {renderTabContent()}
+            </motion.div>
+          </AnimatePresence>
         </div>
 
-        {/* Drawing / Handwriting Canvas */}
-        <DrawingCanvas data={drawingData} onChange={onDrawingChange} readOnly={readOnly} />
-
-        {/* Bottom spacer for mobile scroll */}
-        <div className="h-8 sm:h-12" />
+        {/* Bottom spacer */}
+        <div className="h-6 sm:h-10" />
       </div>
     </motion.div>
   );

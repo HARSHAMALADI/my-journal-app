@@ -1,4 +1,4 @@
-const CACHE_NAME = 'my-journal-v3';
+const CACHE_NAME = 'my-journal-v4';
 
 const STATIC_ASSETS = [
   '/',
