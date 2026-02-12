@@ -22,18 +22,35 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope("https://www.googleapis.com/auth/calendar.events.readonly");
 
 // --- Auth Functions ---
 
 export async function signInWithGoogle(): Promise<User | null> {
   try {
     const result = await signInWithPopup(auth, googleProvider);
+    // Capture Google OAuth access token for Calendar API
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      localStorage.setItem("google_calendar_token", credential.accessToken);
+    }
     return result.user;
   } catch (error: unknown) {
     const e = error as { code?: string };
     if (e.code === "auth/popup-closed-by-user") return null;
     console.error("Google sign-in error:", error);
     return null;
+  }
+}
+
+export function getGoogleCalendarToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("google_calendar_token");
+}
+
+export function clearGoogleCalendarToken(): void {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("google_calendar_token");
   }
 }
 

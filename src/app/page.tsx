@@ -7,7 +7,8 @@ import MonthlySpread from "@/components/MonthlySpread";
 import DailyPage from "@/components/DailyPage";
 import LoginScreen from "@/components/LoginScreen";
 import { useAuth } from "@/components/AuthProvider";
-import { saveData, loadData, signOut } from "@/lib/firebase";
+import { saveData, loadData, signOut, getGoogleCalendarToken } from "@/lib/firebase";
+import { fetchGoogleCalendarEvents, fetchAppleCalendarEvents, type CalendarEvent } from "@/lib/calendar";
 import { LogOut } from "lucide-react";
 
 type View = "cover" | "monthly" | "daily";
@@ -100,6 +101,13 @@ export default function Home() {
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Calendar integration state
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [appleCalendarUrl, setAppleCalendarUrl] = useState("");
+  const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
+
   useEffect(() => { setIsClient(true); }, []);
 
   // Load month data
@@ -168,6 +176,58 @@ export default function Home() {
       if (d) setDayData((prev) => ({ ...prev, drawing: d }));
     } catch { /* empty */ }
   }, [selectedDate, isClient]);
+
+  // Load Apple Calendar URL from localStorage
+  useEffect(() => {
+    if (!isClient) return;
+    const saved = localStorage.getItem("apple_calendar_url");
+    if (saved) setAppleCalendarUrl(saved);
+  }, [isClient]);
+
+  // Fetch calendar events when date changes
+  useEffect(() => {
+    if (!isClient || !user) return;
+
+    let cancelled = false;
+    async function loadCalendarEvents() {
+      setCalendarLoading(true);
+      setCalendarError(null);
+      const events: CalendarEvent[] = [];
+
+      // Google Calendar
+      const googleToken = getGoogleCalendarToken();
+      if (googleToken) {
+        try {
+          const googleEvents = await fetchGoogleCalendarEvents(selectedDate, googleToken);
+          events.push(...googleEvents);
+        } catch (err: any) {
+          if (err?.message === "TOKEN_EXPIRED") {
+            setCalendarError("Google Calendar token expired. Sign out and back in to reconnect.");
+          } else {
+            console.error("Google Calendar error:", err);
+          }
+        }
+      }
+
+      // Apple Calendar
+      if (appleCalendarUrl) {
+        try {
+          const appleEvents = await fetchAppleCalendarEvents(appleCalendarUrl, selectedDate);
+          events.push(...appleEvents);
+        } catch (err) {
+          console.error("Apple Calendar error:", err);
+        }
+      }
+
+      if (!cancelled) {
+        setCalendarEvents(events);
+        setCalendarLoading(false);
+      }
+    }
+
+    loadCalendarEvents();
+    return () => { cancelled = true; };
+  }, [selectedDate, isClient, user, appleCalendarUrl, calendarRefreshKey]);
 
   const handleDayClick = (day: number) => {
     setSelectedDate(new Date(currentYear, currentMonth, day));
@@ -264,6 +324,15 @@ export default function Home() {
             onScheduleChange={(i, task) => setDayData((p) => ({ ...p, schedule: p.schedule.map((s, idx) => idx === i ? { ...s, task } : s) }))}
             onNotesChange={(v) => setDayData((p) => ({ ...p, notes: v }))}
             onDrawingChange={(v) => setDayData((p) => ({ ...p, drawing: v }))}
+            calendarEvents={calendarEvents}
+            calendarLoading={calendarLoading}
+            calendarError={calendarError}
+            onRefreshCalendar={() => setCalendarRefreshKey((k) => k + 1)}
+            appleCalendarUrl={appleCalendarUrl}
+            onAppleCalendarUrlChange={(url: string) => {
+              setAppleCalendarUrl(url);
+              localStorage.setItem("apple_calendar_url", url);
+            }}
             onBack={() => setView("monthly")}
             onPrevDay={handlePrevDay} onNextDay={handleNextDay}
           />

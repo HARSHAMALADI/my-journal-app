@@ -2,7 +2,9 @@
 
 import { useRef, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Pen, Eraser } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pen, Eraser, Calendar, RefreshCw, Settings, X } from "lucide-react";
+import { mapEventsToSchedule, type CalendarEvent } from "@/lib/calendar";
+import { getGoogleCalendarToken } from "@/lib/firebase";
 
 interface TodoItem {
   text: string;
@@ -27,6 +29,12 @@ interface DailyPageProps {
   onScheduleChange: (index: number, task: string) => void;
   onNotesChange: (val: string) => void;
   onDrawingChange: (data: string) => void;
+  calendarEvents: CalendarEvent[];
+  calendarLoading: boolean;
+  calendarError: string | null;
+  onRefreshCalendar: () => void;
+  appleCalendarUrl: string;
+  onAppleCalendarUrlChange: (url: string) => void;
   onBack: () => void;
   onPrevDay: () => void;
   onNextDay: () => void;
@@ -175,7 +183,10 @@ export default function DailyPage({
   date, priorities, todoItems, intention, schedule, dailyNotes, drawingData,
   habits, dailyHabits,
   onPrioritiesChange, onTodoToggle, onTodoTextChange, onHabitToggle, onIntentionChange, onScheduleChange,
-  onNotesChange, onDrawingChange, onBack, onPrevDay, onNextDay,
+  onNotesChange, onDrawingChange,
+  calendarEvents, calendarLoading, calendarError, onRefreshCalendar,
+  appleCalendarUrl, onAppleCalendarUrlChange,
+  onBack, onPrevDay, onNextDay,
 }: DailyPageProps) {
   const dayOfWeek = DAY_NAMES[date.getDay()];
   const dayNum = date.getDate();
@@ -183,6 +194,7 @@ export default function DailyPage({
   const readOnly = isPastDate(date);
 
   const [activeTab, setActiveTab] = useState(0);
+  const [showCalendarSettings, setShowCalendarSettings] = useState(false);
   const touchStart = useRef(0);
   const tabBarRef = useRef<HTMLDivElement>(null);
 
@@ -338,30 +350,90 @@ export default function DailyPage({
           </div>
         );
 
-      case "schedule":
+      case "schedule": {
+        const eventsBySlot = mapEventsToSchedule(calendarEvents);
         return (
           <div className="flex flex-col flex-1">
-            <p className="text-ink-light text-xs sm:text-sm tracking-wide mb-3 sm:mb-4">
-              Plan your day hour by hour
-            </p>
+            {/* Header with calendar controls */}
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <p className="text-ink-light text-xs sm:text-sm tracking-wide">
+                Plan your day hour by hour
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={onRefreshCalendar}
+                  disabled={calendarLoading}
+                  className="p-1.5 rounded-lg hover:bg-ink-light/10 transition-colors text-ink-light hover:text-ink-dark cursor-pointer disabled:opacity-50"
+                  title="Refresh calendar"
+                >
+                  <RefreshCw size={14} className={calendarLoading ? "animate-spin" : ""} />
+                </button>
+                <button
+                  onClick={() => setShowCalendarSettings(true)}
+                  className="p-1.5 rounded-lg hover:bg-ink-light/10 transition-colors text-ink-light hover:text-ink-dark cursor-pointer"
+                  title="Calendar settings"
+                >
+                  <Settings size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* Calendar error */}
+            {calendarError && (
+              <div className="mb-3 px-3 py-2 rounded-lg bg-red-50/80 border border-red-200/60">
+                <p className="text-xs text-red-700">{calendarError}</p>
+              </div>
+            )}
+
+            {/* Schedule slots */}
             <div className="space-y-0 flex-1 overflow-y-auto diary-scroll">
-              {schedule.map((slot, idx) => (
-                <div key={idx} className="flex items-center border-b border-line/30 h-9 sm:h-11">
-                  <span className="w-16 sm:w-20 text-xs sm:text-sm text-ink-light font-medium shrink-0 tabular-nums">
-                    {slot.time}
-                  </span>
-                  <input
-                    type="text"
-                    value={slot.task}
-                    onChange={(e) => onScheduleChange(idx, e.target.value)}
-                    readOnly={readOnly}
-                    className={`flex-1 bg-transparent text-sm sm:text-base text-ink-dark font-sans pl-2 sm:pl-3 min-w-0 ${readOnly ? "opacity-70 cursor-default" : ""}`}
-                  />
-                </div>
-              ))}
+              {schedule.map((slot, idx) => {
+                const slotEvents = eventsBySlot.get(idx) || [];
+                return (
+                  <div key={idx} className="border-b border-line/30">
+                    <div className="flex items-center h-9 sm:h-11">
+                      <span className="w-16 sm:w-20 text-xs sm:text-sm text-ink-light font-medium shrink-0 tabular-nums">
+                        {slot.time}
+                      </span>
+                      <input
+                        type="text"
+                        value={slot.task}
+                        onChange={(e) => onScheduleChange(idx, e.target.value)}
+                        readOnly={readOnly}
+                        className={`flex-1 bg-transparent text-sm sm:text-base text-ink-dark font-sans pl-2 sm:pl-3 min-w-0 ${readOnly ? "opacity-70 cursor-default" : ""}`}
+                      />
+                    </div>
+                    {/* Calendar events for this slot */}
+                    {slotEvents.length > 0 && (
+                      <div className="pl-16 sm:pl-20 pr-2 pb-1.5 space-y-1">
+                        {slotEvents.map((event) => (
+                          <div
+                            key={event.id}
+                            className={`flex items-center gap-2 px-2.5 py-1 rounded-md text-xs ${
+                              event.source === "google"
+                                ? "bg-blue-50/80 text-blue-700 border border-blue-200/60"
+                                : "bg-purple-50/80 text-purple-700 border border-purple-200/60"
+                            }`}
+                          >
+                            <Calendar size={11} className="shrink-0" />
+                            <span className="flex-1 truncate font-medium">{event.summary}</span>
+                            <span className="text-[10px] opacity-70 shrink-0">
+                              {new Date(event.start).toLocaleTimeString("en-US", {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
+      }
 
       case "notes":
         return (
@@ -490,6 +562,69 @@ export default function DailyPage({
         {/* Bottom spacer */}
         <div className="h-6 sm:h-10" />
       </div>
+      {/* Calendar Settings Modal */}
+      {showCalendarSettings && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-paper rounded-xl shadow-2xl max-w-md w-full p-5 sm:p-6"
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-serif text-lg sm:text-xl text-ink-dark font-semibold">
+                Calendar Settings
+              </h3>
+              <button
+                onClick={() => setShowCalendarSettings(false)}
+                className="p-1.5 hover:bg-ink-light/10 rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              {/* Google Calendar */}
+              <div>
+                <label className="text-sm font-medium text-ink-dark mb-2 block font-sans">
+                  Google Calendar
+                </label>
+                <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-line/50 bg-cream/50">
+                  <div className={`w-2.5 h-2.5 rounded-full ${
+                    getGoogleCalendarToken() ? "bg-green-500" : "bg-ink-light/30"
+                  }`} />
+                  <span className="text-sm text-ink font-sans">
+                    {getGoogleCalendarToken() ? "Connected — events will sync automatically" : "Sign out and back in to connect Calendar"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Apple Calendar */}
+              <div>
+                <label className="text-sm font-medium text-ink-dark mb-2 block font-sans">
+                  Apple Calendar (iCal URL)
+                </label>
+                <input
+                  type="url"
+                  value={appleCalendarUrl}
+                  onChange={(e) => onAppleCalendarUrlChange(e.target.value)}
+                  placeholder="webcal://p123-caldav.icloud.com/..."
+                  className="w-full px-3 py-2.5 border border-line/50 rounded-lg text-sm bg-white/80 font-sans focus:border-ink-light/50 transition-colors"
+                />
+                <p className="text-xs text-ink-light mt-1.5 font-sans">
+                  In iCloud Calendar → Share Calendar → Copy Link
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowCalendarSettings(false)}
+              className="w-full mt-6 px-4 py-2.5 bg-ink-dark text-cream rounded-lg font-medium font-sans hover:bg-ink transition-colors cursor-pointer"
+            >
+              Done
+            </button>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 }
