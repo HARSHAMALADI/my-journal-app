@@ -204,13 +204,16 @@ export default function DailyPage({
   const { weeks, currentDay } = getMiniCalendar(date);
   const readOnly = isPastDate(date);
 
-  // Safety: ensure todoItems is always an array
+  // Safety: ensure todoItems is always a clean array
   const safeTodos: TodoItem[] = Array.isArray(todoItems)
-    ? todoItems.map((item) =>
-        item && typeof item === "object"
-          ? { text: item.text || "", done: !!item.done }
-          : { text: String(item || ""), done: false }
-      )
+    ? todoItems.map((item) => {
+        if (item && typeof item === "object") {
+          const text = String(item.text || "");
+          return { text: text.includes("[object Object]") ? "" : text, done: !!item.done };
+        }
+        const str = String(item || "");
+        return { text: str.includes("[object Object]") ? "" : str, done: false };
+      })
     : Array.from({ length: 6 }, () => ({ text: "", done: false }));
 
   return (

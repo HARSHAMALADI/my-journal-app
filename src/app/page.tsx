@@ -49,10 +49,13 @@ function dKey(date: Date) { return `${date.getFullYear()}-${date.getMonth()}-${d
 function normalizeTodo(todo: any): TodoItem[] {
   // If it's a plain string (old format), convert lines to items
   if (typeof todo === "string") {
+    // Discard corrupted "[object Object]" strings
+    if (todo.includes("[object Object]")) {
+      return Array.from({ length: 6 }, () => ({ text: "", done: false }));
+    }
     const lines = (todo as string).split("\n").filter((l: string) => l.trim());
     if (lines.length > 0) {
       const items = lines.map((text: string) => ({ text, done: false }));
-      // Pad to at least 6 items
       while (items.length < 6) items.push({ text: "", done: false });
       return items;
     }
@@ -61,8 +64,11 @@ function normalizeTodo(todo: any): TodoItem[] {
   // If it's an array, ensure each item has proper shape
   if (Array.isArray(todo)) {
     const items = todo.map((item: any) => {
-      if (typeof item === "string") return { text: item, done: false };
-      if (item && typeof item === "object") return { text: item.text || "", done: !!item.done };
+      if (typeof item === "string") {
+        if (item.includes("[object Object]")) return { text: "", done: false };
+        return { text: item, done: false };
+      }
+      if (item && typeof item === "object") return { text: String(item.text || ""), done: !!item.done };
       return { text: "", done: false };
     });
     while (items.length < 6) items.push({ text: "", done: false });
